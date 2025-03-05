@@ -15,6 +15,7 @@
 #include "llk_param_structs.h"
 #include "llk_unpack_common.h"
 #include "debug/waypoint.h"
+#include "debug/dprint.h"
 
 /*************************************************************************
  * LLK UNPACK COMMON
@@ -49,10 +50,16 @@ inline void llk_unpack_debug_dump(std::uint8_t* data, std::uint32_t byte_size) {
 inline void llk_unpack_debug_dump_seek(std::uint8_t offset) { _llk_unpack_debug_dump_seek_(offset); }
 
 template <bool to_from_int8 = false, bool is_fp32_dest_acc_en = false, bool is_tile_dim_reconfig_en = false>
-inline void llk_unpack_reconfig_data_format_srca(const std::uint32_t srca_new_operand) {
+inline void llk_unpack_reconfig_data_format_srca(const std::uint32_t srca_new_operand, const bool print = false) {
     const std::uint32_t srca_operand_id = get_operand_id(srca_new_operand);
     const std::uint32_t num_faces = get_operand_num_faces(srca_operand_id);
     const std::uint32_t face_r_dim = get_operand_face_r_dim(srca_operand_id);
+
+    if (print) {
+        DPRINT << "+ Urcfg!: sf " << static_cast<int>(unpack_src_format[srca_operand_id]) << " df "
+               << static_cast<int>(unpack_dst_format[srca_operand_id]) << ENDL();
+    }
+
     _llk_unpack_reconfig_data_format_srca_impl_<to_from_int8, is_fp32_dest_acc_en>(
         unpack_src_format[srca_operand_id],
         unpack_dst_format[srca_operand_id],
@@ -72,16 +79,21 @@ inline void llk_unpack_reconfig_data_format_srcb(const std::uint32_t srcb_new_op
 
 template <bool to_from_int8 = false, bool is_fp32_dest_acc_en = false, bool is_tile_dim_reconfig_en = false>
 inline void llk_unpack_reconfig_data_format_srca(
-    const std::uint32_t srca_old_operand, const std::uint32_t srca_new_operand) {
+    const std::uint32_t srca_old_operand, const std::uint32_t srca_new_operand, const bool print = false) {
     std::uint32_t old_srca_operand_id = get_operand_id(srca_old_operand);
     std::uint32_t new_srca_operand_id = get_operand_id(srca_new_operand);
 
+    if (print) {
+        DPRINT << "+ Urcfg: od " << static_cast<int>(unpack_src_format[old_srca_operand_id]) << " nw "
+               << static_cast<int>(unpack_src_format[new_srca_operand_id]) << ENDL();
+    }
+
     if ((unpack_src_format[old_srca_operand_id] != unpack_src_format[new_srca_operand_id])) {
         llk_unpack_reconfig_data_format_srca<to_from_int8, is_fp32_dest_acc_en, is_tile_dim_reconfig_en>(
-            srca_new_operand);
+            srca_new_operand, print);
     } else if constexpr (is_tile_dim_reconfig_en) {
         llk_unpack_reconfig_data_format_srca<to_from_int8, is_fp32_dest_acc_en, is_tile_dim_reconfig_en>(
-            srca_new_operand);
+            srca_new_operand, print);
     }
 }
 
