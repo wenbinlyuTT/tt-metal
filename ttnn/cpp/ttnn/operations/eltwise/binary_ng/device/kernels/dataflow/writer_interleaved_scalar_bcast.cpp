@@ -6,6 +6,8 @@
 
 #include "dataflow_api.h"
 #include "cpp/ttnn/operations/eltwise/binary_ng/device/kernels/dataflow/fill_tile_utils.hpp"
+#include "debug/dprint.h"
+#include "debug/dprint_tile.h"
 
 void kernel_main() {
     const uint32_t src_addr = get_arg_val<uint32_t>(0);
@@ -57,6 +59,10 @@ void kernel_main() {
     uint32_t next_batch_shift = n_stride - c_stride * C;
     uint32_t next_depth_shift = nD_stride - (n_stride * N);
 
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0)) {
+        DPRINT << "Writer SB: src_num_tiles " << src_num_tiles << " dst_num_tiles " << dst_num_tiles << ENDL();
+    }
+
     uint32_t num_tiles_written = 0;
     for (uint32_t nd = start_d; nd < cND && num_tiles_written < dst_num_tiles; ++nd, start_n = 0) {
         for (uint32_t n = start_n; n < N && num_tiles_written < dst_num_tiles; ++n, start_c = 0) {
@@ -66,7 +72,9 @@ void kernel_main() {
                 uint32_t l1_write_addr = get_write_ptr(cb_id_src);
                 noc_async_read_tile(tile_offset, src, l1_write_addr);
                 noc_async_read_barrier();
+                DPRINT << TSLICE(cb_id_src, 0, SliceRange::hw041(), TSLICE_INPUT_CB, TSLICE_RD_PTR, true, true) << ENDL();
                 FILL_TILE_WITH_FIRST_ELEMENT(cb_id_src);
+                DPRINT << TSLICE(cb_id_src, 0, SliceRange::hw041(), TSLICE_INPUT_CB, TSLICE_RD_PTR, true, true) << ENDL();
                 cb_push_back(cb_id_src, onetile);
 
                 for (uint32_t t = start_t; t < HtWt && num_tiles_written < dst_num_tiles; ++t, ++num_tiles_written) {
@@ -82,5 +90,9 @@ void kernel_main() {
             tile_offset += next_batch_shift;
         }
         tile_offset += next_depth_shift;
+    }
+
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0) || (num_tiles_written != 0)) {
+        DPRINT << "Writer SB: num_tiles_written " << num_tiles_written << ENDL();
     }
 }

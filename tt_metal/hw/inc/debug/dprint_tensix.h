@@ -159,7 +159,7 @@ inline void dprint_tensix_dest_reg_row_float16(uint32_t data_format, uint16_t ro
 
 // Print the contents of tile with index tile_id within the destination register
 template <bool print_by_face = false>
-void dprint_tensix_dest_reg(int tile_id = 0) {
+void dprint_tensix_dest_reg(int tile_id = 0, const char* info = nullptr) {
     dbg_halt();
     MATH({
         // Determine the format of the data in the destination register
@@ -183,7 +183,8 @@ void dprint_tensix_dest_reg(int tile_id = 0) {
 #endif
         // Print the contents
         DPRINT << FIXED() << SETW(WIDTH) << SETPRECISION(PRECISION);
-        DPRINT << "Tile ID = " << tile_id << ENDL();
+        DPRINT << "Tile ID = " << tile_id << (is_float32 ? " is f32" : " not f32") << " fmt "
+               << data_format_reg_field_value << ((info == nullptr) ? "" : info) << ENDL();
 
         for (int face_id = 0; face_id < NUM_FACES_PER_TILE; ++face_id) {
             for (int row_id = 0; row_id < NUM_ROWS_PER_FACE; ++row_id) {

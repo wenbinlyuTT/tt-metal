@@ -415,14 +415,30 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     uint32_t c_num_tiles_per_shard = has_sharding ? shard_specs->c_shard_spec.numel() / tile_hw : 0;
 
     auto a_data_format = datatype_to_dataformat_converter(a_dtype);
+    // TODO: questionable
+    // QT: scalar -> b = a = bf16
+    //     tensor -> b = bf16
+    // DQ: scalar -> b = a = i32 (???)
+    //     tensor -> b = bf16
     auto b_data_format = b.has_value() ? datatype_to_dataformat_converter(b->get_dtype())
                          : is_sfpu_op  ? datatype_to_dataformat_converter(a_dtype)
                                        : DataFormat::Float16_b;
     auto c_data_format = datatype_to_dataformat_converter(c.get_dtype());
 
+    std::cout << "++ BinaryNg:"
+              << " a_dtype " << a_dtype << " b_dtype " << b_dtype << " a_data_format " << a_data_format
+              << " b_data_format " << b_data_format << " c_data_format " << c_data_format << std::endl;
+
     uint32_t a_single_tile_size = tt_metal::detail::TileSize(a_data_format);
     uint32_t b_single_tile_size = tt_metal::detail::TileSize(b_data_format);
     uint32_t c_single_tile_size = tt_metal::detail::TileSize(c_data_format);
+
+    std::cout << "++ BinaryNg: " << magic_enum::enum_name(operation_attributes.binary_op_type) << " b.has_value? "
+              << std::boolalpha << b.has_value() << "\n++ BinaryNg: A " << magic_enum::enum_name(a_data_format)
+              << " single tile bytes " << a_single_tile_size << "\n++ BinaryNg: B "
+              << magic_enum::enum_name(b_data_format) << " single tile bytes " << b_single_tile_size
+              << "\n++ BinaryNg: C " << magic_enum::enum_name(c_data_format) << " single tile bytes "
+              << c_single_tile_size << std::endl;
 
     // we parallelize the computation across the output tiles
     const auto& all_device_cores = operation_attributes.worker_grid;
@@ -534,25 +550,13 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     uint32_t c_is_dram = c_buffer->buffer_type() == tt_metal::BufferType::DRAM;
 
     auto kernel_config = CMAKE_UNIQUE_NAMESPACE::BinaryNgKernelConfig(operation_attributes.subtile_broadcast_type);
+    std::cout << "++ BinaryNg: " << magic_enum::enum_name(kernel_config.reader_kernel) << ' '
+              << magic_enum::enum_name(kernel_config.compute_kernel) << ' '
+              << magic_enum::enum_name(kernel_config.writer_kernel) << " input str " << kernel_config.bcast_input_str()
+              << std::endl;
 
-    std::map<std::string, std::string> dataflow_defines;
-    if (is_sfpu_op && a_dtype == DataType::FLOAT32) {
-        dataflow_defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element<float>";
-        dataflow_defines["FILL_WITH_VALUE_FLOAT"] = "fill_with_val<1024, float>";
-    } else if (is_sfpu_op && a_dtype == DataType::INT32) {
-        dataflow_defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element<int32_t>";
-        dataflow_defines["FILL_WITH_VALUE"] = "fill_with_val<1024, int32_t>";
-    } else {
-        dataflow_defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column_bfloat16";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row_bfloat16";
-        dataflow_defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element_bfloat16";
-        dataflow_defines["FILL_WITH_VALUE"] = "fill_with_val_bfloat16";
-    }
-    auto reader_defines = dataflow_defines;
+    std::map<std::string, std::string> reader_defines;
+    add_dataflow_defines(reader_defines, a_dtype, is_sfpu_op);
     reader_defines["SRC_SHARDED"] = a_sharded ? "1" : "0";
 
     // READER KERNEL
@@ -567,10 +571,14 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     auto compute_kernel = CMAKE_UNIQUE_NAMESPACE::KernelName::ComputeScalar;
     if (b.has_value()) {
         b_is_dram = b_buffer->buffer_type() == tt_metal::BufferType::DRAM;
+        std::cout << "++ BinaryNg: correcting kernels " << magic_enum::enum_name(writer_kernel) << " -> "
+                  << magic_enum::enum_name(kernel_config.writer_kernel) << ", " << magic_enum::enum_name(compute_kernel)
+                  << " -> " << magic_enum::enum_name(kernel_config.compute_kernel) << std::endl;
         writer_kernel = kernel_config.writer_kernel;
         compute_kernel = kernel_config.compute_kernel;
     }
-    auto writer_defines = dataflow_defines;
+    std::map<std::string, std::string> writer_defines;
+    add_dataflow_defines(writer_defines, b_dtype, is_sfpu_op);
     writer_defines["SRC_SHARDED"] = b_sharded ? "1" : "0";
     writer_defines["DST_SHARDED"] = c_sharded ? "1" : "0";
 
@@ -608,6 +616,13 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
                 (b_dtype == DataType::FLOAT32) ? UnpackToDestMode::UnpackToDestFp32 : UnpackToDestMode::Default;
         }
     }
+
+    std::cout << "++ BinaryNg (dest unpack modes):"
+              << " CB0 " << magic_enum::enum_name(unpack_to_dest_mode[src0_cb_index]) << " CB1 "
+              << magic_enum::enum_name(unpack_to_dest_mode[src1_cb_index]) << " CB2 "
+              << magic_enum::enum_name(unpack_to_dest_mode[src0interim_cb_index]) << " CB3 "
+              << magic_enum::enum_name(unpack_to_dest_mode[src1interim_cb_index]) << " fp32_dest_acc_en? "
+              << std::boolalpha << fp32_dest_acc_en << std::endl;
 
     compute_kernel_defines["BCAST_INPUT"] = kernel_config.bcast_input_str();
 

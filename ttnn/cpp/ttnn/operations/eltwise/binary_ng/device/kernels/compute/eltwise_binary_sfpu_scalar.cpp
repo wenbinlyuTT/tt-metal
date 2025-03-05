@@ -16,6 +16,8 @@
 #include "eltwise_utils_common.hpp"
 #include "eltwise_utils_sfpu.hpp"
 
+#include "debug/dprint.h"
+
 namespace NAMESPACE {
 void MAIN {
     uint32_t num_tiles = get_arg_val<uint32_t>(0);
@@ -28,6 +30,11 @@ void MAIN {
 
     constexpr auto cb_post_lhs = HAS_ACTIVATIONS(LHS) ? tt::CBIndex::c_3 : cb_pre_lhs;
     constexpr auto cb_post_rhs = HAS_ACTIVATIONS(RHS) ? tt::CBIndex::c_4 : cb_pre_rhs;
+
+    UNPACK(DPRINT << "++ SFPU Kernel Preparing:"
+                  << " num_tiles " << num_tiles << " num_tiles_per_cycle " << num_tiles_per_cycle << " CB_"
+                  << static_cast<int>(cb_post_lhs) << " -> dst0"
+                  << " CB_" << static_cast<int>(cb_post_rhs) << " -> dst1" << ENDL(););
 
     unary_op_init_common(cb_post_lhs, cb_out);
 #ifdef PACK_RELU
