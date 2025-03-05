@@ -230,6 +230,17 @@ public:
     const std::string write_to_string() const;
     void print() const;
 
+    void print_info(const char* header) const {
+        std::cout << header << std::boolalpha << " dtype " << magic_enum::enum_name(get_dtype()) << " layout "
+                  << magic_enum::enum_name(get_layout()) << " logical rank " << get_logical_shape().rank()
+                  << " logical shape volume " << get_logical_shape().volume() << " padded rank "
+                  << get_padded_shape().rank() << " padded shape volume " << get_padded_shape().volume() << " volume "
+                  << volume() << " logical volume " << get_logical_volume() << " scalar? " << is_scalar()
+                  << " memory_layout " << magic_enum::enum_name(memory_config().memory_layout) << " buffer_type "
+                  << magic_enum::enum_name(memory_config().buffer_type) << " sharded? " << memory_config().is_sharded()
+                  << " l1? " << memory_config().is_l1() << " dram? " << memory_config().is_dram() << std::endl;
+    }
+
     Tensor extract_shard(const CoreCoord& core) const;
     Tensor extract_shard(const uint32_t& core_id) const;
 

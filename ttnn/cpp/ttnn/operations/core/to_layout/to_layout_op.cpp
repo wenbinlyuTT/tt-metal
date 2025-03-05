@@ -45,6 +45,8 @@ Tensor to_layout_impl(
     const std::optional<ttnn::DataType>& dtype,
     const std::optional<ttnn::MemoryConfig>& memory_config,
     T* device) {
+    std::cout << "++ ToLayout: " << magic_enum::enum_name(tensor_arg.get_layout()) << "->"
+              << magic_enum::enum_name(layout) << std::endl;
     if (tensor_arg.get_layout() == layout) {
         if (dtype.has_value() and dtype.value() != tensor_arg.get_dtype()) {
             tt::log_warning(
@@ -91,6 +93,7 @@ Tensor to_layout_impl(
             SmallVector<uint32_t> new_padded_shape(2, 1);
             new_padded_shape[1] = tensor.get_padded_shape()[-1];
             new_padded_shape[0] = tensor.get_padded_shape()[-2];
+            std::cout << "++ ToLayout: calling the first view()" << std::endl;
             tensor = ttnn::experimental::view(tensor, tensor.get_logical_shape(), Shape(new_padded_shape));
         }
     }
@@ -189,6 +192,7 @@ Tensor to_layout_impl(
             }
             tensor = tensor.pad(ttnn::Shape(padded_output_shape), ttnn::Shape(std::move(padded_input_start)), 0);
             tensor = device ? tensor.to_layout(layout, device) : tensor.to_layout(layout);
+            std::cout << "++ ToLayout: calling and returning from the second view()" << std::endl;
             return ttnn::experimental::view(tensor, output_shape, padded_output_shape);
         } else {
             TT_THROW("ttnn::to_layout: Unsupported output layout: {}!", layout);

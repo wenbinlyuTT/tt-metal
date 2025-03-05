@@ -6,6 +6,18 @@
 
 #include "dataflow_api.h"
 #include "cpp/ttnn/operations/eltwise/binary_ng/device/kernels/dataflow/fill_tile_utils.hpp"
+#include "debug/dprint.h"
+#include "debug/dprint_tile.h"
+
+void print_tile(
+    uint8_t cb, int tile, uint8_t max_h, uint8_t max_w, bool endl_rows, bool print_untilized, const char* src_loc) {
+    DPRINT << "+++++++ print_tile(" << static_cast<int>(cb) << ',' << tile << ") +++++++ " << src_loc << ENDL();
+    for (uint8_t r = 0; r < max_h; r++) {
+        const auto sr = SliceRange{.h0 = r, .h1 = static_cast<uint8_t>(r + 1), .hs = 1, .w0 = 0, .w1 = max_w, .ws = 1};
+        DPRINT << static_cast<int>(r) << ": "
+               << TileSlice<64>(cb, tile, sr, TSLICE_INPUT_CB, TSLICE_RD_PTR, endl_rows, print_untilized) << ENDL();
+    }
+}
 
 void kernel_main() {
     const uint32_t packed_scalar = get_arg_val<uint32_t>(0);
@@ -42,15 +54,23 @@ void kernel_main() {
     uint32_t start_c = start_remaining_2 / tiles_per_channel;  // C index
     uint32_t start_t = start_remaining_2 % tiles_per_channel;
 
+    if (dst_num_tiles != 0) {
+        DPRINT << "Writer S: dst_num_tiles " << dst_num_tiles << ENDL();
+    }
+
     // we only need to fill a tile with the scalar value once
     cb_reserve_back(cb_id_src, onetile);
+    print_tile(cb_id_src, 0, 8, 8, true, true, " before Writer S fill");
 #ifdef FILL_WITH_VALUE_FLOAT
+    DPRINT << "++ Writer S: calling FILL_WITH_VALUE_FLOAT" << ENDL();
     const auto float_ptr = reinterpret_cast<const float*>(&packed_scalar);
     FILL_WITH_VALUE_FLOAT(cb_id_src, *float_ptr);
 #endif
 #ifdef FILL_WITH_VALUE
+    DPRINT << "++ Writer S: calling FILL_WITH_VALUE" << ENDL();
     FILL_WITH_VALUE(cb_id_src, packed_scalar);
 #endif
+    print_tile(cb_id_src, 0, 8, 8, true, true, " after Writer S fill");
     cb_push_back(cb_id_src, onetile);
 
     uint32_t num_tiles_written = 0;
@@ -67,5 +87,9 @@ void kernel_main() {
                 }
             }
         }
+    }
+
+    if ((dst_num_tiles != 0) || (num_tiles_written != 0)) {
+        DPRINT << "Writer S: num_tiles_written " << num_tiles_written << ENDL();
     }
 }

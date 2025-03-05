@@ -106,6 +106,7 @@ std::string BinaryNgKernelConfig::bcast_input_str() const {
 }
 
 std::string get_kernel_file_path(KernelName kernel_name, bool is_sfpu) {
+    std::cout << "++ BinaryNg: get kernel file path for " << magic_enum::enum_name(kernel_name) << std::endl;
     constexpr std::string_view root = "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels";
     constexpr std::string_view dataflow = "{}/dataflow/{}";
     constexpr std::string_view compute = "{}/compute/{}";
@@ -329,6 +330,25 @@ void add_activation_defines(
             unary::utils::update_macro_defines(a.op_type, defines);
             return std::move(process);
         });
+}
+
+void add_dataflow_defines(std::map<std::string, std::string>& defines, const DataType dtype, const bool is_sfpu_op) {
+    if (is_sfpu_op && dtype == DataType::FLOAT32) {
+        defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column";
+        defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row";
+        defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element<float>";
+        defines["FILL_WITH_VALUE_FLOAT"] = "fill_with_val<1024, float>";
+    } else if (is_sfpu_op && dtype == DataType::INT32) {
+        defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column";
+        defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row";
+        defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element<int32_t>";
+        defines["FILL_WITH_VALUE"] = "fill_with_val<1024, int32_t>";
+    } else {
+        defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column_bfloat16";
+        defines["FILL_TILE_WITH_FIRST_ROW"] = "fill_tile_with_first_row_bfloat16";
+        defines["FILL_TILE_WITH_FIRST_ELEMENT"] = "fill_tile_with_first_element_bfloat16";
+        defines["FILL_WITH_VALUE"] = "fill_with_val_bfloat16";
+    }
 }
 
 bool OpConfig::is_sfpu_op() const { return std::holds_alternative<SfpuBinaryOp>(binary_op); }

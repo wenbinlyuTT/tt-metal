@@ -5,10 +5,13 @@
 #pragma once
 
 #include "dataflow_api.h"
+#include "debug/dprint.h"
 
 // Fills one full tile of bfloat16 with a scalar value
 // Scalar is assumed to be a 16-bit value double packed into a u32
 FORCE_INLINE void fill_with_val_bfloat16(uint32_t cb_id, uint32_t packed_scalar) {
+    DPRINT << "++ " << __PRETTY_FUNCTION__ << ": fill packed_scalar 0x" << HEX() << packed_scalar << " into CB "
+           << cb_id << " @ 0x" << get_write_ptr(cb_id) << ENDL();
     auto* ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(get_write_ptr(cb_id));
     // 1024 is the number of elements in a full tile, but since the scalar is packed into a u32,
     // each iteration writes 2 elements, hence the division by 2
@@ -19,6 +22,8 @@ FORCE_INLINE void fill_with_val_bfloat16(uint32_t cb_id, uint32_t packed_scalar)
 
 template <uint32_t ElementsV, class ScalarT>
 FORCE_INLINE void fill_with_val(uint32_t cb_id, ScalarT scalar) {
+    DPRINT << "++ " << __PRETTY_FUNCTION__ << ": fill scalar 0x" << HEX() << scalar << " into CB " << cb_id << " @ 0x"
+           << get_write_ptr(cb_id) << ENDL();
     auto* ptr = reinterpret_cast<volatile tt_l1_ptr ScalarT*>(get_write_ptr(cb_id));
     for (uint32_t i = 0; i < ElementsV; ++i) {
         ptr[i] = scalar;
@@ -31,6 +36,8 @@ FORCE_INLINE void fill_tile_with_first_element_bfloat16(uint32_t cb_id) {
     auto* read_ptr = reinterpret_cast<volatile tt_l1_ptr uint16_t*>(get_write_ptr(cb_id));
     const uint16_t first_elem = read_ptr[0];
     const uint32_t packed_first_elem = first_elem << 16 | first_elem;
+    DPRINT << "++ " << __PRETTY_FUNCTION__ << ": fill first_elem 0x" << HEX() << first_elem << " into CB " << cb_id
+           << " @ 0x" << get_write_ptr(cb_id) << " packed_first_elem 0x" << packed_first_elem << ENDL();
 
     // Since all elements in the tile are the same, we can ignore the faces and assume the entire
     // tile is contiguous in memory.
@@ -47,6 +54,8 @@ template <typename T>
 FORCE_INLINE void fill_tile_with_first_element(uint32_t cb_id) {
     auto* read_ptr = reinterpret_cast<volatile tt_l1_ptr T*>(get_write_ptr(cb_id));
     const T first_elem = read_ptr[0];
+    DPRINT << "++ " << __PRETTY_FUNCTION__ << ": fill first_elem 0x" << HEX() << first_elem << " into CB " << cb_id
+           << " @ 0x" << get_write_ptr(cb_id) << ENDL();
 
     auto* write_ptr = reinterpret_cast<volatile tt_l1_ptr T*>(get_write_ptr(cb_id));
     for (uint32_t i = 0; i < 1024; ++i) {

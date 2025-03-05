@@ -14,6 +14,7 @@
 #include "llk_operands.h"
 #include "llk_param_structs.h"
 #include "debug/waypoint.h"
+#include "debug/dprint.h"
 
 // Need to revisit why we even need this
 #define EPS 1.19209e-07  // std::numeric_limits::epsilon() for FP32
@@ -61,8 +62,13 @@ inline void llk_math_debug_dump(std::uint8_t* data, std::uint32_t byte_size) { _
 inline void llk_math_debug_dump_seek(std::uint8_t offset) { _llk_math_debug_dump_seek_(offset); }
 
 template <bool to_from_int8 = false, bool is_fp32_dest_acc_en = false>
-inline void llk_math_reconfig_data_format_srca(const std::uint32_t srca_new_operand) {
+inline void llk_math_reconfig_data_format_srca(const std::uint32_t srca_new_operand, const bool print = false) {
     std::uint32_t new_srca_operand_id = get_operand_id(srca_new_operand);
+
+    if (print) {
+        DPRINT << "+ Mrcfg!: " << static_cast<int>(unpack_dst_format[new_srca_operand_id]) << ENDL();
+    }
+
     _llk_math_reconfig_data_format_srca_<to_from_int8, is_fp32_dest_acc_en>(unpack_dst_format[new_srca_operand_id]);
 }
 
@@ -104,12 +110,17 @@ inline void llk_math_reconfig_data_format(
 
 template <bool to_from_int8 = false, bool is_fp32_dest_acc_en = false>
 inline void llk_math_reconfig_data_format_srca(
-    const std::uint32_t srca_old_operand, const std::uint32_t srca_new_operand) {
+    const std::uint32_t srca_old_operand, const std::uint32_t srca_new_operand, const bool print = false) {
     std::uint32_t old_srca_operand_id = get_operand_id(srca_old_operand);
     std::uint32_t new_srca_operand_id = get_operand_id(srca_new_operand);
 
+    if (print) {
+        DPRINT << "+ Mrcfg: od " << static_cast<int>(unpack_dst_format[old_srca_operand_id]) << " nw "
+               << static_cast<int>(unpack_dst_format[new_srca_operand_id]) << ENDL();
+    }
+
     if ((unpack_dst_format[old_srca_operand_id] != unpack_dst_format[new_srca_operand_id])) {
-        llk_math_reconfig_data_format_srca<to_from_int8, is_fp32_dest_acc_en>(srca_new_operand);
+        llk_math_reconfig_data_format_srca<to_from_int8, is_fp32_dest_acc_en>(srca_new_operand, print);
     }
 }
 

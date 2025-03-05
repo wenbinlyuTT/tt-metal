@@ -5,6 +5,7 @@
 #pragma once
 
 #include "compute_kernel_api/common_globals.h"
+#include "debug/dprint.h"
 
 #ifdef TRISC_MATH
 #include "llk_math_unary_datacopy_api.h"
@@ -22,15 +23,15 @@ namespace ckernel {
  *
  * | Argument    | Description                                       | Type     | Valid Range                                        | Required |
  * |-------------|---------------------------------------------------|----------|----------------------------------------------------|----------|
- * | cbid        | The identifier of the input circular buffer (CB)  | uint32_t | 0 to 31                                            | False    | 
+ * | cbid        | The identifier of the input circular buffer (CB)  | uint32_t | 0 to 31                                            | False    |
  * | transpose   | Flag to perform transpose on SrcA                 | uint32_t | Any positive value will indicate tranpose is set   | False    |
  */
- // clang-format on
-ALWI void copy_tile_to_dst_init_short(uint32_t cbid, uint32_t transpose = 0) {
+// clang-format on
+ALWI void copy_tile_to_dst_init_short(uint32_t cbid, uint32_t transpose = 0, bool print = false) {
     UNPACK((llk_unpack_A_init<BroadcastType::NONE, false, EltwiseBinaryReuseDestType::NONE, UnpackToDestEn>(
-        transpose, false /*transpose within 16x16 face*/, cbid)));
+        transpose, false /*transpose within 16x16 face*/, cbid, print)));
     MATH((llk_math_eltwise_unary_datacopy_init<A2D, BroadcastType::NONE, DST_ACCUM_MODE>(
-        false /*transpose of faces*/, false /*transpose within 16x16 face*/, cbid)));
+        false /*transpose of faces*/, false /*transpose within 16x16 face*/, cbid, print)));
 }
 /**
  * Perform a init for the copy tile operation. This calls the short init function and initializes packer dst offset
@@ -49,12 +50,16 @@ ALWI void copy_tile_init(uint32_t cbid) { copy_tile_to_dst_init_short(cbid); }
  * | transpose      | Flag to perform transpose on SrcA                                 | uint32_t | Any positive value will indicate tranpose is set  | False    |
  */
  // clang-format on
-ALWI void copy_tile_to_dst_init_short_with_dt(uint32_t old_cbid, uint32_t new_cbid, uint32_t transpose = 0) {
+ALWI void copy_tile_to_dst_init_short_with_dt(
+    uint32_t old_cbid, uint32_t new_cbid, uint32_t transpose = 0, bool print = false) {
+    if (print) {
+        UNPACK(DPRINT << "+ cp_tile_i_dt: od " << old_cbid << " nw " << new_cbid << ENDL(););
+    }
     // This reconfig call checks if old operand has different data format to
     // new operand idx, otherwise no reconfig call occurs
-    UNPACK((llk_unpack_reconfig_data_format_srca(old_cbid, new_cbid)));
-    MATH((llk_math_reconfig_data_format_srca(old_cbid, new_cbid)));
-    copy_tile_to_dst_init_short(new_cbid, transpose);
+    UNPACK((llk_unpack_reconfig_data_format_srca(old_cbid, new_cbid, print)));
+    MATH((llk_math_reconfig_data_format_srca(old_cbid, new_cbid, print)));
+    copy_tile_to_dst_init_short(new_cbid, transpose, print);
 }
 
 // clang-format off
@@ -74,15 +79,18 @@ ALWI void copy_tile_to_dst_init_short_with_dt(uint32_t old_cbid, uint32_t new_cb
  * | Argument       | Description                                       | Data type | Valid range                                         | required |
  * |----------------|---------------------------------------------------|-----------|-----------------------------------------------------|----------|
  * | in_cb_id       | The identifier of the source circular buffer (CB) | uint32_t  | 0 to 31                                             | True     |
- * | in_tile_index  | The index of the tile to copy from the input CB   | uint32_t  | Must be less than the size of the CB                | True     | 
+ * | in_tile_index  | The index of the tile to copy from the input CB   | uint32_t  | Must be less than the size of the CB                | True     |
  * | dst_tile_index | The index of the tile in the DST register         | uint32_t  | Must be less than the size of the DST register (16) | True     |
  * */
- // clang-format on
-ALWI void copy_tile(uint32_t in_cb_id, uint32_t in_tile_index, uint32_t dst_tile_index) {
+// clang-format on
+ALWI void copy_tile(uint32_t in_cb_id, uint32_t in_tile_index, uint32_t dst_tile_index, bool print = false) {
+    if (print) {
+        UNPACK(DPRINT << "+ cp_tile: " << in_cb_id << ':' << in_tile_index << "->" << dst_tile_index << ENDL());
+    }
     UNPACK((llk_unpack_A<BroadcastType::NONE, false, EltwiseBinaryReuseDestType::NONE, UnpackToDestEn>(
-        in_cb_id, in_tile_index)));
+        in_cb_id, in_tile_index, 0, print)));
     MATH((llk_math_eltwise_unary_datacopy<A2D, BroadcastType::NONE, DST_ACCUM_MODE, UnpackToDestEn>(
-        dst_tile_index, in_cb_id)));
+        dst_tile_index, in_cb_id, print)));
 }
 
 ALWI void copy_block_matmul_partials(
