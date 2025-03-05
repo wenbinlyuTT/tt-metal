@@ -74,31 +74,41 @@ CoreRangeSet get_worker_grid(
 }
 
 SubtileBroadcastType get_subtile_broadcast_type(uint32_t a_h, uint32_t a_w, uint32_t b_h, uint32_t b_w) {
+    std::cout << "++ BinaryNg: subtile bcast type ";
     if (a_h == b_h && a_w == b_w) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::NONE) << std::endl;
         return SubtileBroadcastType::NONE;
     }
     if (a_h == 1 && a_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::SCALAR_A) << std::endl;
         return SubtileBroadcastType::SCALAR_A;
     }
     if (b_h == 1 && b_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::SCALAR_B) << std::endl;
         return SubtileBroadcastType::SCALAR_B;
     }
     if (a_h == 1 /* && a_w != 1 */ && b_w == 1 /* && b_h != 1 */) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_A_COL_B) << std::endl;
         return SubtileBroadcastType::ROW_A_COL_B;
     }
     if (a_w == 1 /* && a_h != 1 */ && b_h == 1 /* && b_w != 1 */) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_B_COL_A) << std::endl;
         return SubtileBroadcastType::ROW_B_COL_A;
     }
     if (a_h == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_A) << std::endl;
         return SubtileBroadcastType::ROW_A;
     }
     if (a_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::COL_A) << std::endl;
         return SubtileBroadcastType::COL_A;
     }
     if (b_h == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_B) << std::endl;
         return SubtileBroadcastType::ROW_B;
     }
     if (b_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::COL_B) << std::endl;
         return SubtileBroadcastType::COL_B;
     }
 

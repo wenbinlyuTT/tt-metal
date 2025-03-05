@@ -16,7 +16,21 @@
 #include "eltwise_utils_common.hpp"
 #include "eltwise_utils_sfpu.hpp"
 
+#include <debug/dprint.h>
+#include <debug/dprint_tile.h>
+#include <debug/dprint_tensix.h>
+
 namespace NAMESPACE {
+
+void print_tile(
+    uint8_t cb, int tile, uint8_t max_h, uint8_t max_w, bool endl_rows, bool print_untilized, const char* src_loc) {
+    DPRINT << "+++++++ print_tile(" << static_cast<int>(cb) << ',' << tile << ") +++++++ " << src_loc << ENDL();
+    // If the number of entries is small, construct a single SliceRange or just use SliceRange::hw041()
+    for (uint8_t r = 0; r < max_h; r++) {
+        const auto sr = SliceRange{.h0 = r, .h1 = static_cast<uint8_t>(r + 1), .hs = 1, .w0 = 0, .w1 = max_w, .ws = 1};
+        DPRINT << static_cast<int>(r) << ": " << TileSlice<64>(cb, tile, sr, endl_rows, print_untilized) << ENDL();
+    }
+}
 
 ALWI void process_tile(
     tt::CBIndex cb_pre_lhs,
@@ -85,6 +99,9 @@ void MAIN {
     if (num_tiles == 0) {
         return;
     }
+
+    print_tile(1, 0, 3, 3, true, true, __PRETTY_FUNCTION__);
+    print_tile(1, 1, 3, 3, true, true, __PRETTY_FUNCTION__);
 
     constexpr auto cb_pre_lhs = tt::CBIndex::c_0;
     constexpr auto cb_pre_rhs = tt::CBIndex::c_1;

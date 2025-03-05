@@ -6,6 +6,8 @@
 
 #include "dataflow_api.h"
 #include "cpp/ttnn/operations/eltwise/binary_ng/device/kernels/dataflow/fill_tile_utils.hpp"
+#include "debug/dprint.h"
+#include "debug/dprint_tile.h"
 
 void kernel_main() {
     const uint32_t src_addr = get_arg_val<uint32_t>(0);
@@ -72,5 +74,11 @@ void kernel_main() {
             tile_offset += c_stride;
         }
         tile_offset += next_batch_shift;
+    }
+
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0) || (num_tiles_written != 0)) {
+        DPRINT << "Writer:"
+               << " src_num_tiles " << src_num_tiles << " dst_num_tiles " << dst_num_tiles << " num_tiles_written "
+               << num_tiles_written << ENDL();
     }
 }
