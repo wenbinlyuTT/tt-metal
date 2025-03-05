@@ -31,6 +31,37 @@ std::tuple<std::array<uint32_t, N>, CBHandle> create_cb(
         cb_config.set_globally_allocated_address(*buffer);
     }
 
+    std::cout << "++ create_cb:"
+              << " page size " << page_size << " num pages " << num_pages << " buffer " << buffer << " total size "
+              << cb_config.total_size() << " global addr " << cb_config.globally_allocated_address().value_or(0);
+
+    std::cout << " tiles { ";
+    for (const auto& t : cb_config.tiles()) {
+        if (t.has_value()) {
+            std::cout << "* ";
+        }
+    }
+
+    std::cout << "} buf idx { ";
+    for (const auto& i : cb_config.buffer_indices()) {
+        std::cout << static_cast<int>(i) << ' ';
+    }
+
+    std::cout << "} data formats { ";
+    for (const auto& f : cb_config.data_formats()) {
+        if (f.has_value()) {
+            std::cout << magic_enum::enum_name(f.value()) << ' ';
+        }
+    }
+
+    std::cout << "} page sizes { ";
+    for (const auto& s : cb_config.page_sizes()) {
+        if (s.has_value()) {
+            std::cout << s.value() << ' ';
+        }
+    }
+    std::cout << "}" << std::endl;
+
     std::array<uint32_t, N> cbs_out;
     std::copy(cbs, cbs + N, cbs_out.begin());
     return std::make_tuple(cbs_out, tt_metal::CreateCircularBuffer(program, core_spec, cb_config));

@@ -16,7 +16,21 @@
 #include "eltwise_utils_common.hpp"
 #include "eltwise_utils_sfpu.hpp"
 
+#include <debug/dprint.h>
+#include <debug/dprint_tile.h>
+#include <debug/dprint_tensix.h>
+
 namespace NAMESPACE {
+
+void print_tile(
+    uint8_t cb, int tile, uint8_t max_h, uint8_t max_w, bool endl_rows, bool print_untilized, const char* src_loc) {
+    DPRINT << "+++++++ print_tile(" << static_cast<int>(cb) << ',' << tile << ") +++++++ " << src_loc << ENDL();
+    // If the number of entries is small, construct a single SliceRange or just use SliceRange::hw041()
+    for (uint8_t r = 0; r < max_h; r++) {
+        const auto sr = SliceRange{.h0 = r, .h1 = static_cast<uint8_t>(r + 1), .hs = 1, .w0 = 0, .w1 = max_w, .ws = 1};
+        DPRINT << static_cast<int>(r) << ": " << TileSlice<64>(cb, tile, sr, endl_rows, print_untilized) << ENDL();
+    }
+}
 
 ALWI void process_tile(
     tt::CBIndex cb_pre_lhs,
@@ -54,15 +68,20 @@ ALWI void process_tile(
         BINARY_SFPU_INIT
 #endif
         tile_regs_acquire();
-        copy_tile_to_dst_init_short_with_dt(cb_post_rhs, cb_post_lhs);
+        copy_tile_to_dst_init_short_with_dt(cb_post_rhs, cb_post_lhs, 0, true);
         for (uint32_t i = 0; i < num_tiles_per_cycle; ++i) {
-            copy_tile(cb_post_lhs, i, i * 2);
+            dprint_tensix_dest_reg(i * 2, " start");
+            dprint_tensix_dest_reg(i * 2 + 1, " start");
+            copy_tile(cb_post_lhs, i, i * 2, true);
         }
-        copy_tile_to_dst_init_short_with_dt(cb_post_lhs, cb_post_rhs);
+        copy_tile_to_dst_init_short_with_dt(cb_post_lhs, cb_post_rhs, 0, true);
         for (uint32_t i = 0; i < num_tiles_per_cycle; ++i) {
-            copy_tile(cb_post_rhs, i, i * 2 + 1);
-
+            dprint_tensix_dest_reg(i * 2, " after lhs copy");
+            copy_tile(cb_post_rhs, i, i * 2 + 1, true);
+            dprint_tensix_dest_reg(i * 2, " after rhs copy");
+            dprint_tensix_dest_reg(i * 2 + 1, " after rhs copy");
             BINARY_SFPU_OP(i * 2, i * 2 + 1);
+            dprint_tensix_dest_reg(i * 2, " after sfpu op");
             PROCESS_POST_ACTIVATIONS(i * 2);
         }
         tile_regs_commit();
@@ -90,12 +109,19 @@ void MAIN {
         return;
     }
 
+    UNPACK(print_tile(1, 0, 3, 3, true, true, __PRETTY_FUNCTION__));
+    UNPACK(print_tile(1, 1, 3, 3, true, true, __PRETTY_FUNCTION__));
+
     constexpr auto cb_pre_lhs = tt::CBIndex::c_0;
     constexpr auto cb_pre_rhs = tt::CBIndex::c_1;
     constexpr auto cb_out = tt::CBIndex::c_2;
 
     constexpr auto cb_post_lhs = HAS_ACTIVATIONS(LHS) ? tt::CBIndex::c_3 : cb_pre_lhs;
     constexpr auto cb_post_rhs = HAS_ACTIVATIONS(RHS) ? tt::CBIndex::c_4 : cb_pre_rhs;
+
+    UNPACK(DPRINT << "+ SFPU Ker: n_tiles " << num_tiles << " n_tiles/cycle " << num_tiles_per_cycle << " CB"
+                  << static_cast<int>(cb_post_lhs) << "->dst0 CB" << static_cast<int>(cb_post_rhs) << "->dst1"
+                  << ENDL(););
 
     unary_op_init_common(cb_post_lhs, cb_out);
 #ifdef PACK_RELU

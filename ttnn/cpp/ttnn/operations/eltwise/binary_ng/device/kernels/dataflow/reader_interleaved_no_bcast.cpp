@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "dataflow_api.h"
+#include "debug/dprint.h"
+#include "debug/dprint_tile.h"
 
 void kernel_main() {
     const uint32_t src_addr = get_arg_val<uint32_t>(0);
@@ -56,6 +58,10 @@ void kernel_main() {
     uint32_t next_batch_shift = n_stride - c_stride * C;
     uint32_t next_depth_shift = nD_stride - (n_stride * N);
 
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0)) {
+        DPRINT << "Reader: src_num_tiles " << src_num_tiles << " dst_num_tiles " << dst_num_tiles << ENDL();
+    }
+
     uint32_t num_tiles_read = 0;
     for (uint32_t nd = start_d; nd < cND && num_tiles_read < dst_num_tiles; ++nd, start_n = 0) {
         for (uint32_t n = start_n; n < N && num_tiles_read < dst_num_tiles; ++n, start_c = 0) {
@@ -79,6 +85,10 @@ void kernel_main() {
             tile_offset += next_batch_shift;
         }
         tile_offset += next_depth_shift;
+    }
+
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0) || (num_tiles_read != 0)) {
+        DPRINT << "Reader: num_tiles_read " << num_tiles_read << ENDL();
     }
 #endif
 }

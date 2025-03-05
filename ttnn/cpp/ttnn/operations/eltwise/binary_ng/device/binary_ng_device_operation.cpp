@@ -45,6 +45,10 @@ bool is_binary_sfpu_op(BinaryOpType val, DataType a, DataType b) {
     }
     return false;
 }
+
+bool is_quant_op(const BinaryOpType val) {
+    return (val == BinaryOpType::QUANT) || (val == BinaryOpType::DEQUANT) || (val == BinaryOpType::REQUANT);
+}
 }  // namespace utils
 
 CoreRangeSet get_worker_grid(
@@ -74,31 +78,41 @@ CoreRangeSet get_worker_grid(
 }
 
 SubtileBroadcastType get_subtile_broadcast_type(uint32_t a_h, uint32_t a_w, uint32_t b_h, uint32_t b_w) {
+    std::cout << "++ BinaryNg: subtile bcast type ";
     if (a_h == b_h && a_w == b_w) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::NONE) << std::endl;
         return SubtileBroadcastType::NONE;
     }
     if (a_h == 1 && a_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::SCALAR_A) << std::endl;
         return SubtileBroadcastType::SCALAR_A;
     }
     if (b_h == 1 && b_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::SCALAR_B) << std::endl;
         return SubtileBroadcastType::SCALAR_B;
     }
     if (a_h == 1 /* && a_w != 1 */ && b_w == 1 /* && b_h != 1 */) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_A_COL_B) << std::endl;
         return SubtileBroadcastType::ROW_A_COL_B;
     }
     if (a_w == 1 /* && a_h != 1 */ && b_h == 1 /* && b_w != 1 */) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_B_COL_A) << std::endl;
         return SubtileBroadcastType::ROW_B_COL_A;
     }
     if (a_h == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_A) << std::endl;
         return SubtileBroadcastType::ROW_A;
     }
     if (a_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::COL_A) << std::endl;
         return SubtileBroadcastType::COL_A;
     }
     if (b_h == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::ROW_B) << std::endl;
         return SubtileBroadcastType::ROW_B;
     }
     if (b_w == 1) {
+        std::cout << magic_enum::enum_name(SubtileBroadcastType::COL_B) << std::endl;
         return SubtileBroadcastType::COL_B;
     }
 
@@ -108,9 +122,6 @@ SubtileBroadcastType get_subtile_broadcast_type(uint32_t a_h, uint32_t a_w, uint
 tt::stl::hash::hash_t BinaryNgDeviceOperation::operation_attributes_t::to_hash() const {
     // TODO: a more generalized way to skip the hashing of an UnaryWithParam?
     // Don't hash the quantization scale, otherwise we build the kernel for each different scale
-    const bool is_quant_op = (binary_op_type == BinaryOpType::QUANT) or (binary_op_type == BinaryOpType::DEQUANT) or
-                             (binary_op_type == BinaryOpType::REQUANT);
-
     return tt::stl::hash::hash_objects_with_default_seed(
         binary_op_type,
         lhs_activations,
@@ -120,7 +131,8 @@ tt::stl::hash::hash_t BinaryNgDeviceOperation::operation_attributes_t::to_hash()
         get_dtype(),
         compute_kernel_config,
         subtile_broadcast_type,
-        is_sfpu);
+        is_sfpu,
+        is_quant_op);
 }
 
 DataType BinaryNgDeviceOperation::operation_attributes_t::get_dtype() const {
@@ -413,6 +425,7 @@ BinaryNgDeviceOperation::invoke(
     DataType dtype_b = input_tensor_b.get_dtype();
     bool device_check = input_tensor_a.device()->arch() != tt::ARCH::GRAYSKULL;
     bool is_sfpu_op = (utils::is_binary_sfpu_op(binary_op_type, dtype_a, dtype_b) && device_check);
+    bool is_quant_op = utils::is_quant_op(binary_op_type);
 
     return {
         operation_attributes_t{
@@ -427,7 +440,8 @@ BinaryNgDeviceOperation::invoke(
             get_worker_grid(input_tensor_a, &input_tensor_b, output_tensor),
             std::nullopt,
             subtile_broadcast_type,
-            is_sfpu_op},
+            is_sfpu_op,
+            is_quant_op},
         tensor_args_t{input_tensor_a, input_tensor_b, std::move(output_tensor)}};
 }
 
@@ -445,6 +459,8 @@ BinaryNgDeviceOperation::invoke(
     DataType dtype_a = input_tensor_a.get_dtype();
     bool device_check = input_tensor_a.device()->arch() != tt::ARCH::GRAYSKULL;
     bool is_sfpu_op = (utils::is_binary_sfpu_op(binary_op_type, dtype_a, dtype_a) && device_check);
+    bool is_quant_op = utils::is_quant_op(binary_op_type);
+
     return {
         operation_attributes_t{
             binary_op_type,
@@ -458,7 +474,8 @@ BinaryNgDeviceOperation::invoke(
             get_worker_grid(input_tensor_a, nullptr, output_tensor),
             std::nullopt,
             SubtileBroadcastType::NONE,
-            is_sfpu_op},
+            is_sfpu_op,
+            is_quant_op},
         tensor_args_t{input_tensor_a, std::nullopt, std::move(output_tensor)}};
 }
 
