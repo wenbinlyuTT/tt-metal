@@ -392,6 +392,11 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     uint32_t c_num_tiles_per_shard = has_sharding ? shard_specs->c_shard_spec.numel() / tile_hw : 0;
 
     auto a_data_format = datatype_to_dataformat_converter(a_dtype);
+    // TODO: questionable
+    // QT: scalar -> b = a = bf16
+    //     tensor -> b = bf16
+    // DQ: scalar -> b = a = i32 (???)
+    //     tensor -> b = bf16
     auto b_data_format = b.has_value() ? datatype_to_dataformat_converter(b->get_dtype())
                          : is_sfpu_op  ? datatype_to_dataformat_converter(a_dtype)
                                        : DataFormat::Float16_b;
@@ -400,6 +405,12 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     uint32_t a_single_tile_size = tt_metal::detail::TileSize(a_data_format);
     uint32_t b_single_tile_size = tt_metal::detail::TileSize(b_data_format);
     uint32_t c_single_tile_size = tt_metal::detail::TileSize(c_data_format);
+
+    std::cout << "++ BinaryNg: b.has_value? " << std::boolalpha << b.has_value() << "\n++ BinaryNg: A "
+              << magic_enum::enum_name(a_data_format) << " single tile bytes " << a_single_tile_size
+              << "\n++ BinaryNg: B " << magic_enum::enum_name(b_data_format) << " single tile bytes "
+              << b_single_tile_size << "\n++ BinaryNg: C " << magic_enum::enum_name(c_data_format)
+              << " single tile bytes " << c_single_tile_size << std::endl;
 
     // we parallelize the computation across the output tiles
     const auto& all_device_cores = operation_attributes.worker_grid;
@@ -511,7 +522,12 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     uint32_t c_is_dram = c_buffer->buffer_type() == tt_metal::BufferType::DRAM;
 
     auto kernel_config = CMAKE_UNIQUE_NAMESPACE::BinaryNgKernelConfig(operation_attributes.subtile_broadcast_type);
+    std::cout << "++ BinaryNg: " << magic_enum::enum_name(kernel_config.reader_kernel) << ' '
+              << magic_enum::enum_name(kernel_config.compute_kernel) << ' '
+              << magic_enum::enum_name(kernel_config.writer_kernel) << " input str " << kernel_config.bcast_input_str()
+              << std::endl;
 
+    // TODO: questionable
     std::map<std::string, std::string> dataflow_defines;
     if (is_sfpu_op && a_dtype == DataType::FLOAT32) {
         dataflow_defines["FILL_TILE_WITH_FIRST_COLUMN"] = "fill_tile_with_first_column";

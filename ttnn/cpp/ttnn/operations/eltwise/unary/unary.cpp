@@ -22,6 +22,11 @@ inline Tensor unary_impl(
     const std::vector<UnaryWithParam>& op_chain,
     const std::optional<MemoryConfig>& memory_config = std::nullopt,
     const std::optional<Tensor>& optional_output_tensor = std::nullopt) {
+    std::cout << "++ UnaryOp( ";
+    for (const auto& u : op_chain) {
+        std::cout << magic_enum::enum_name(u.op_type) << ' ';
+    }
+    std::cout << "): begin" << std::endl;
     DataType output_dtype = (op_chain[0].op_type == UnaryOpType::TYPECAST)
                                 ? static_cast<DataType>(op_chain[0].params[1])
                                 : input_tensor.get_dtype();

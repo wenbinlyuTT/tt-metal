@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "dataflow_api.h"
+#include "debug/dprint.h"
+#include "debug/dprint_tile.h"
 
 void kernel_main() {
     const uint32_t src_addr = get_arg_val<uint32_t>(0);
@@ -48,6 +50,12 @@ void kernel_main() {
     uint32_t next_channel_shift = c_stride - HtWt;
     uint32_t next_batch_shift = n_stride - c_stride * C;
 
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0)) {
+        DPRINT << "Reader:"
+               << " src_num_tiles " << src_num_tiles << " dst_num_tiles " << dst_num_tiles << ENDL();
+        DPRINT << TSLICE(1, 0, SliceRange::hw041(), TSLICE_INPUT_CB, TSLICE_RD_PTR, true, true) << ENDL();
+    }
+
     uint32_t num_tiles_read = 0;
     for (uint32_t n = start_n; n < N && num_tiles_read < dst_num_tiles; ++n, start_c = 0) {
         for (uint32_t c = start_c; c < C && num_tiles_read < dst_num_tiles; ++c, start_th = 0) {
@@ -67,6 +75,10 @@ void kernel_main() {
             tile_offset += next_channel_shift;
         }
         tile_offset += next_batch_shift;
+    }
+
+    if ((src_num_tiles != 0) || (dst_num_tiles != 0) || (num_tiles_read != 0)) {
+        DPRINT << "Reader:" << " num_tiles_read " << num_tiles_read << ENDL();
     }
 #endif
 }

@@ -106,6 +106,7 @@ std::string BinaryNgKernelConfig::bcast_input_str() const {
 }
 
 std::string get_kernel_file_path(KernelName kernel_name, bool is_sfpu) {
+    std::cout << "++ BinaryNg: get kernel file path for " << magic_enum::enum_name(kernel_name) << std::endl;
     constexpr std::string_view root = "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels";
     constexpr std::string_view dataflow = "{}/dataflow/{}";
     constexpr std::string_view compute = "{}/compute/{}";
